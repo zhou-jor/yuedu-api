@@ -69,14 +69,20 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      packages: read
 
     steps:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 10m
+          envs: GHCR_TOKEN
           script: |
             set -e
             mkdir -p /opt/yuedu
@@ -130,7 +136,10 @@ jobs:
                 driver: bridge
             DCEOF
 
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u zhou-jor --password-stdin || true
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u zhou-jor --password-stdin || true
             docker compose pull api || true
+            docker compose pull mongo || true
+            docker compose pull redis || true
             docker compose up -d
+            docker compose ps
             echo "✅ Deploy done"
