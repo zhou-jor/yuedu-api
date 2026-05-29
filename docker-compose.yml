@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: yuedu-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/yuedu
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - yuedu-network
+
+  mongo:
+    image: mongo:6.0
+    container_name: yuedu-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - yuedu-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: yuedu-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - yuedu-network
+
+volumes:
+  mongo-data:
+  redis-data:
+  uploads:
+
+networks:
+  yuedu-network:
+    driver: bridge
