@@ -1,0 +1,120 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [master]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+
+            mkdir -p /opt/yuedu
+            cd /opt/yuedu
+
+            echo '${{ secrets.DEPLOY_ENV }}' > .env
+
+            cat > docker-compose.yml << 'DCEOF'
+            services:
+              api:
+                image: ghcr.io/${{ github.repository }}:latest
+                container_name: yuedu-api
+                restart: unless-stopped
+                ports:
+                  - "3000:3000"
+                env_file:
+                  - .env
+                depends_on:
+                  - mongo
+                  - redis
+                volumes:
+                  - uploads:/app/uploads
+                networks:
+                  - yuedu-network
+
+              mongo:
+                image: mongo:7.0
+                container_name: yuedu-mongo
+                restart: unless-stopped
+                volumes:
+                  - mongo-data:/data/db
+                networks:
+                  - yuedu-network
+
+              redis:
+                image: redis:7-alpine
+                container_name: yuedu-redis
+                restart: unless-stopped
+                volumes:
+                  - redis-data:/data
+                networks:
+                  - yuedu-network
+
+            volumes:
+              mongo-data:
+              redis-data:
+              uploads:
+
+            networks:
+              yuedu-network:
+                driver: bridge
+            DCEOF
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            docker compose pull api
+            docker compose up -d
+
+            echo "✅ Deployed successfully"
