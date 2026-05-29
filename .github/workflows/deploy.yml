@@ -24,10 +24,19 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install & Build TypeScript
+      - name: Install dependencies
         run: |
-          npm ci
-          npm run build
+          npm ci || npm install
+          test -d node_modules/typescript || { echo "❌ Dependencies not installed"; exit 1; }
+          echo "✅ Dependencies installed"
+
+      - name: Build TypeScript
+        run: npx tsc
+
+      - name: Verify build output
+        run: |
+          test -f dist/server.js || { echo "❌ Build output missing"; exit 1; }
+          echo "✅ Build OK: $(find dist -name '*.js' | wc -l) JS files"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
