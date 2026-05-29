@@ -23,15 +23,19 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Install dependencies
         run: |
-          npm install --no-optional
-          ls node_modules/.package-lock.json || { echo "❌ npm install failed"; exit 1; }
-          npx tsc --version
+          pnpm install --no-optional
+          pnpm exec tsc --version
           echo "✅ Dependencies OK"
 
       - name: Build TypeScript
-        run: npx tsc
+        run: pnpm exec tsc
 
       - name: Verify build output
         run: |
