@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
 import { nanoid } from 'nanoid';
 import { config } from '../config';
 import { AppError } from '../middleware/errorHandler';
@@ -76,13 +75,11 @@ export const uploadService = {
     const dir = path.join(config.upload.dir, 'avatars');
     ensureDir(dir);
 
-    const filename = `${nanoid()}.jpg`;
+    const ext = getExt(file.mimetype, file.originalname) || '.jpg';
+    const filename = `${nanoid()}${ext}`;
     const filepath = path.join(dir, filename);
 
-    await sharp(file.buffer)
-      .resize(400, 400, { fit: 'cover', position: 'centre' })
-      .jpeg({ quality: 85 })
-      .toFile(filepath);
+    await fs.promises.writeFile(filepath, file.buffer);
 
     return { url: buildUrl('avatars', filename) };
   },
