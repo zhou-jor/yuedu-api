@@ -1,6 +1,8 @@
 node_modules
-dist
 .git
 .env
 uploads
 *.md
+src
+tsconfig.json
+pnpm-lock.yaml
